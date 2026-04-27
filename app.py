@@ -14,6 +14,9 @@ Extra requirements:
 import json
 from pathlib import Path
 from typing import Dict, Tuple
+import os
+import sys
+
 
 import gradio as gr
 import torch
@@ -26,6 +29,13 @@ from inference import (
     load_class_names,
     get_inference_transform,
 )
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(BASE_DIR)
+
+CFG.class_names_path = os.path.join(BASE_DIR, "outputs", "class_names.json")
+CFG.history_path = os.path.join(BASE_DIR, "outputs", "history.json")
+MODEL_PATH = os.path.join(BASE_DIR, "outputs", "best_model.pth")
 
 
 # Global State
@@ -43,7 +53,7 @@ def _load_resources():
 
     try:
         CLASS_NAMES = load_class_names(CFG.class_names_path)
-        MODEL = load_model_for_inference(CFG.best_model_path, DEVICE)
+        MODEL = load_model_for_inference(MODEL_PATH, DEVICE)
         return True, ""
     except FileNotFoundError as e:
         return False, str(e)
@@ -180,13 +190,10 @@ def create_demo() -> gr.Blocks:
                         label="Number of predictions",
                     )
 
-                    predict_btn = gr.Button(
-                        "Analyze",
-                        variant="primary",
-                        size="lg",
-                    )
-
-                clear_btn = gr.Button("Clear", variant="secondary", size="sm")
+                with gr.Row():
+                    predict_btn = gr.Button("Analyze", variant="primary", scale=2)
+                    clear_btn = gr.Button("Clear", variant="secondary", scale=1)
+                
 
             # Output
             with gr.Column(scale=1):
@@ -245,6 +252,28 @@ def create_demo() -> gr.Blocks:
                 """
 
             gr.Markdown(info_text)
+            
+        with gr.Accordion("Food's List", open=False):
+            try:
+                food_list = sorted([name.replace("_", " ").title() for name in CLASS_NAMES])
+                
+                cols = 3
+                rows = (len(food_list) + cols - 1) // cols
+                table_md = "| | | |\n|---|---|---|\n" # Table header ẩn
+                
+                for i in range(rows):
+                    row_str = "|"
+                    for j in range(cols):
+                        idx = i + j * rows
+                        if idx < len(food_list):
+                            row_str += f" {food_list[idx]} |"
+                        else:
+                            row_str += " |"
+                    table_md += row_str + "\n"
+                
+                gr.Markdown(table_md)
+            except:
+                gr.Markdown("Loading...")
 
         # Event handlers
         def predict_wrapper(image, top_k):
@@ -303,3 +332,4 @@ if __name__ == "__main__":
         debug=args.debug,
         show_error=True,
     )
+    
